@@ -1,48 +1,84 @@
 
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#111827">
-  <title>RC Car Controller</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#10151f">
+  <title>Rover Control</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/mqtt@5.10.4/dist/mqtt.min.js"></script>
   <script src="app.js" defer></script>
 </head>
 <body>
-  <main class="controller">
+  <main class="app">
     <header>
-      <p class="eyebrow">ESP8266 · L298N</p>
-      <h1>RC Controller</h1>
-      <p class="subtitle">Remote control console</p>
+      <div class="eyebrow">ESP8266 · MQTT CONTROL</div>
+      <h1>Rover<span>Control</span></h1>
+      <p class="subtitle">Remote control over the internet</p>
     </header>
 
-    <section class="status-panel">
-      <span id="status-dot" class="status-dot"></span>
-      <div>
-        <strong id="status">Not connected</strong>
-        <p id="detail">Cloud connection not configured</p>
+    <section class="panel connection">
+      <div class="section-heading">
+        <h2>Connection</h2>
+        <span id="status-indicator" class="indicator"></span>
+      </div>
+
+      <p id="status" role="status">Not connected</p>
+      <p id="detail" class="muted">Enter your MQTT credentials below.</p>
+
+      <form id="connection-form">
+        <label for="mqtt-user">MQTT username</label>
+        <input id="mqtt-user" autocomplete="username"
+               placeholder="HiveMQ username" required>
+
+        <label for="mqtt-pass">MQTT password</label>
+        <input id="mqtt-pass" type="password"
+               autocomplete="current-password"
+               placeholder="HiveMQ password" required>
+
+        <div class="button-row">
+          <button id="connect" class="primary" type="submit">Connect</button>
+          <button id="disconnect" class="secondary" type="button"
+                  disabled>Disconnect</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel controls">
+      <h2>Drive</h2>
+      <p class="muted">Hold a direction to move. Release to stop.</p>
+
+      <div class="drive-pad">
+        <span></span>
+        <button class="control-button forward" data-drive="forward"
+                aria-label="Drive forward">▲<small>FORWARD</small></button>
+        <span></span>
+
+        <button class="control-button reverse" data-drive="reverse"
+                aria-label="Drive backward">▼<small>REVERSE</small></button>
+        <button id="stop" class="stop-button" type="button">STOP</button>
+        <span></span>
+      </div>
+
+      <div class="divider"></div>
+
+      <h2>Steering</h2>
+      <p class="muted">Tap once for a short steering pulse.</p>
+
+      <div class="steer-pad">
+        <button class="control-button steer" data-steer="left"
+                aria-label="Steer left">◀<small>LEFT</small></button>
+        <div class="center-mark">CENTER<br><span>SPRING RETURN</span></div>
+        <button class="control-button steer" data-steer="right"
+                aria-label="Steer right">▶<small>RIGHT</small></button>
       </div>
     </section>
 
-    <section class="controls" aria-label="Car controls">
-      <button class="control forward" data-drive="forward">▲<small>FORWARD</small></button>
-
-      <div class="middle-row">
-        <button class="control" data-steer="left">◀<small>LEFT</small></button>
-        <button class="control stop" id="stop">■<small>STOP</small></button>
-        <button class="control" data-steer="right">▶<small>RIGHT</small></button>
-      </div>
-
-      <button class="control reverse" data-drive="reverse">▼<small>REVERSE</small></button>
-    </section>
-
-    <p class="hint">
-      Controls will activate after the secure cloud connection is configured.
-      Always keep the car in sight.
-    </p>
-
-    <footer>RC Car Project · Built with ESP8266</footer>
+    <footer>
+      <p>Keep the car in sight. Test with the wheels lifted first.</p>
+      <p>Rover Control · HiveMQ Cloud</p>
+    </footer>
   </main>
 </body>
 </html>
