@@ -1,0 +1,48 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <title>RC Car Controller</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main class="controller">
+    <header>
+      <p class="eyebrow">ESP8266 · L298N</p>
+      <h1>RC Controller</h1>
+      <p class="subtitle">Remote control console</p>
+    </header>
+
+    <section class="status-panel">
+      <span id="status-dot" class="status-dot"></span>
+      <div>
+        <strong id="status">Not connected</strong>
+        <p id="detail">Cloud connection not configured</p>
+      </div>
+    </section>
+
+    <section class="controls" aria-label="Car controls">
+      <button class="control forward" data-drive="forward">▲<small>FORWARD</small></button>
+
+      <div class="middle-row">
+        <button class="control" data-steer="left">◀<small>LEFT</small></button>
+        <button class="control stop" id="stop">■<small>STOP</small></button>
+        <button class="control" data-steer="right">▶<small>RIGHT</small></button>
+      </div>
+
+      <button class="control reverse" data-drive="reverse">▼<small>REVERSE</small></button>
+    </section>
+
+    <p class="hint">
+      Controls will activate after the secure cloud connection is configured.
+      Always keep the car in sight.
+    </p>
+
+    <footer>RC Car Project · Built with ESP8266</footer>
+  </main>
+</body>
+</html>
