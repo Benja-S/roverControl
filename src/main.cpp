@@ -3,6 +3,7 @@
 #include <WiFiClientSecureBearSSL.h>
 #include <PubSubClient.h>
 #include <cstring>
+#include <cstdio>
 #include "secrets.h"
 
 // ==================== MOTOR PINS ====================
@@ -25,16 +26,22 @@ BearSSL::WiFiClientSecure secureClient;
 PubSubClient mqtt(secureClient);
 
 // ==================== TIMING ====================
-const unsigned long DRIVE_TIMEOUT_MS = 500;
-const unsigned long STEER_PULSE_MS = 200;
+// If no "<drive>,<steer>" message arrives for this long, everything stops.
+const unsigned long COMMAND_TIMEOUT_MS = 500;
+// Longest the steering motor is powered in one direction. The steering has a
+// spring return, so holding it means holding power; this protects the motor
+// from stalling at full lock. Raise or lower to suit your steering.
+const unsigned long STEER_MAX_HOLD_MS = 2000;
 const unsigned long MQTT_RETRY_MS = 3000;
 
-unsigned long lastDriveCommand = 0;
-unsigned long steerStopAt = 0;
+unsigned long lastCommandAt = 0;
+unsigned long steerSince = 0;
 unsigned long lastMqttAttempt = 0;
 
 bool driveActive = false;
 bool steeringActive = false;
+int steerDir = 0;          // -1 left, 0 centre, 1 right
+bool steerLocked = false;  // true after STEER_MAX_HOLD_MS until released
 
 // ==================== MOTOR FUNCTIONS ====================
 void stopDrive() {
@@ -52,6 +59,58 @@ void stopSteering() {
 void stopAll() {
     stopDrive();
     stopSteering();
+    steerDir = 0;
+    steerLocked = false;
+}
+
+// drive: 1 forward, -1 reverse, 0 stop
+void applyDrive(int drive) {
+    if (drive > 0) {
+        digitalWrite(DRIVE_IN1, HIGH);
+        digitalWrite(DRIVE_IN2, LOW);
+        driveActive = true;
+    } else if (drive < 0) {
+        digitalWrite(DRIVE_IN1, LOW);
+        digitalWrite(DRIVE_IN2, HIGH);
+        driveActive = true;
+    } else {
+        stopDrive();
+    }
+}
+
+// steer: -1 left, 1 right, 0 centre. Independent of drive.
+void applySteer(int steer) {
+    if (steer != steerDir) {
+        steerDir = steer;
+        steerSince = millis();
+        steerLocked = false;
+    }
+
+    if (steer == 0 || steerLocked) {
+        stopSteering();
+    } else if (steer < 0) {
+        digitalWrite(STEER_IN1, HIGH);
+        digitalWrite(STEER_IN2, LOW);
+        steeringActive = true;
+    } else {
+        digitalWrite(STEER_IN1, LOW);
+        digitalWrite(STEER_IN2, HIGH);
+        steeringActive = true;
+    }
+}
+
+// Parses "<drive>,<steer>" (e.g. "1,-1"). Each value is clamped to -1..1.
+bool parseCommand(const char* text, int& drive, int& steer) {
+    int d = 0;
+    int s = 0;
+
+    if (sscanf(text, "%d,%d", &d, &s) != 2) {
+        return false;
+    }
+
+    drive = constrain(d, -1, 1);
+    steer = constrain(s, -1, 1);
+    return true;
 }
 
 // ==================== MQTT STATUS ====================
@@ -79,40 +138,18 @@ void handleCommand(char* topic, byte* payload, unsigned int length) {
     Serial.print("Received command: ");
     Serial.println(command);
 
-    if (strcmp(command, "forward") == 0) {
-        digitalWrite(DRIVE_IN1, HIGH);
-        digitalWrite(DRIVE_IN2, LOW);
-
-        driveActive = true;
-        lastDriveCommand = millis();
-    }
-    else if (strcmp(command, "reverse") == 0) {
-        digitalWrite(DRIVE_IN1, LOW);
-        digitalWrite(DRIVE_IN2, HIGH);
-
-        driveActive = true;
-        lastDriveCommand = millis();
-    }
-    else if (strcmp(command, "stop") == 0) {
+    if (strcmp(command, "stop") == 0) {
         stopAll();
+        return;
     }
-    else if (strcmp(command, "left") == 0) {
-        if (!steeringActive) {
-            digitalWrite(STEER_IN1, HIGH);
-            digitalWrite(STEER_IN2, LOW);
 
-            steeringActive = true;
-            steerStopAt = millis() + STEER_PULSE_MS;
-        }
-    }
-    else if (strcmp(command, "right") == 0) {
-        if (!steeringActive) {
-            digitalWrite(STEER_IN1, LOW);
-            digitalWrite(STEER_IN2, HIGH);
+    int drive = 0;
+    int steer = 0;
 
-            steeringActive = true;
-            steerStopAt = millis() + STEER_PULSE_MS;
-        }
+    if (parseCommand(command, drive, steer)) {
+        applyDrive(drive);
+        applySteer(steer);
+        lastCommandAt = millis();
     }
 }
 
@@ -306,15 +343,16 @@ void loop() {
 
     mqtt.loop();
 
-    // Stop drive if browser heartbeat/commands stop arriving.
-    if (driveActive &&
-        millis() - lastDriveCommand > DRIVE_TIMEOUT_MS) {
-        stopDrive();
+    // Stop everything if the browser's commands stop arriving.
+    if ((driveActive || steeringActive) &&
+        millis() - lastCommandAt > COMMAND_TIMEOUT_MS) {
+        stopAll();
     }
 
-    // Steering motor only receives a short pulse.
-    if (steeringActive &&
-        (long)(millis() - steerStopAt) >= 0) {
+    // Cut steering power if it has been held too long in one direction.
+    if (steeringActive && !steerLocked &&
+        millis() - steerSince > STEER_MAX_HOLD_MS) {
         stopSteering();
+        steerLocked = true;
     }
 }
